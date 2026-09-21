@@ -688,7 +688,14 @@ function exportCSV(){const headers=['SRL NO','LP NO','NOMENCLATURE','SERIAL NO.'
 function exportHistoryCSV(){const headers=['Date/Time','Type','Transaction No','Product SRL No','Product','Quantity','From/To','Remarks'];const csv=[headers.join(','),...transactions.map(t=>[new Date(t.createdAt).toLocaleString('en-IN'),t.type,t.no,t.srl,t.product,t.qty,t.party,t.remarks].map(v=>'"'+String(v??'').replaceAll('"','""')+'"').join(','))].join('\n');download('cedco_gym_transaction_history.csv',csv,'text/csv;charset=utf-8')}
 function exportJSON(){
   try{
-    const payload={version:7,app:'CEDCO BSF Bengaluru Gym Eqpts Inventory',savedAt:new Date().toISOString(),data:data,transactions:transactions};
+    const payload={
+      schemaVersion:8,
+      version:8,
+      app:'CEDCO BSF Bengaluru Gym Eqpts Inventory',
+      exportedAt:new Date().toISOString(),
+      data:Array.isArray(data)?data:[],
+      transactions:Array.isArray(transactions)?transactions:[]
+    };
     const text=JSON.stringify(payload,null,2);
     const blob=new Blob([text],{type:'application/json;charset=utf-8'});
     const url=URL.createObjectURL(blob);
@@ -699,11 +706,11 @@ function exportJSON(){
     document.body.appendChild(a);
     a.click();
     setTimeout(()=>{a.remove();URL.revokeObjectURL(url)},1500);
-    setTimeout(()=>alert('Backup JSON created successfully. Check your browser Downloads folder.'),100);
+    setTimeout(()=>alert(`Backup JSON created successfully. ${payload.data.length} products and ${payload.transactions.length} transactions included. Check your browser Downloads folder.`),100);
     return true;
   }catch(e){
     console.error('JSON backup failed',e);
-    alert('Backup could not be downloaded. Please check your browser download permissions.');
+    alert('Backup could not be downloaded. Please check browser download permissions.');
     return false;
   }
 }
@@ -727,7 +734,48 @@ function download(name,text,type){
     setTimeout(()=>{a.remove();URL.revokeObjectURL(url)},1500);
   }catch(e){console.error('Download failed',e);alert('Download failed. Please check browser download permissions.')}
 }
-function importJSON(e){const f=e.target.files&&e.target.files[0];if(!f)return;const rd=new FileReader();rd.onload=()=>{try{const x=JSON.parse(rd.result);const incoming=Array.isArray(x)?x:x.data;if(!Array.isArray(incoming))throw new Error('Invalid data');download('cedco_gym_pre_import_backup.json',JSON.stringify({version:7,data,transactions},null,2),'application/json');data=incoming;transactions=Array.isArray(x.transactions)?x.transactions:[];save();renderAll();alert('Backup imported successfully.');}catch(err){console.error('Import failed',err);alert('Invalid JSON backup. Please select a CEDCO inventory backup JSON file.');}finally{e.target.value='';}};rd.readAsText(f)}
+function extractBackupPayload(x){
+  // Accept all CEDCO backup formats used by previous versions.
+  let root=x;
+  if(root && typeof root==='object' && root.backup && typeof root.backup==='object') root=root.backup;
+  if(root && typeof root==='object' && root.payload && typeof root.payload==='object') root=root.payload;
+  let incoming=null;
+  if(Array.isArray(root)) incoming=root;
+  else if(root && Array.isArray(root.data)) incoming=root.data;
+  else if(root && Array.isArray(root.products)) incoming=root.products;
+  else if(root && Array.isArray(root.inventory)) incoming=root.inventory;
+  else if(root && Array.isArray(root.records)) incoming=root.records;
+  if(!Array.isArray(incoming)) return null;
+  const tx=(root && Array.isArray(root.transactions))?root.transactions:[];
+  return {data:incoming,transactions:tx};
+}
+function importJSON(e){
+  const f=e.target.files&&e.target.files[0];
+  if(!f)return;
+  const rd=new FileReader();
+  rd.onload=()=>{
+    try{
+      const raw=String(rd.result||'').replace(/^\uFEFF/,'').trim();
+      if(!raw)throw new Error('The selected file is empty.');
+      const x=JSON.parse(raw);
+      const parsed=extractBackupPayload(x);
+      if(!parsed)throw new Error('No inventory array found.');
+      if(!parsed.data.length && !confirm('The selected backup contains 0 products. Import it anyway?')) return;
+      download('cedco_gym_pre_import_backup.json',JSON.stringify({schemaVersion:8,version:8,app:'CEDCO BSF Bengaluru Gym Eqpts Inventory',exportedAt:new Date().toISOString(),data,transactions},null,2),'application/json;charset=utf-8');
+      data=structuredClone(parsed.data);
+      transactions=structuredClone(parsed.transactions);
+      save();
+      renderAll();
+      showView('inventory');
+      alert(`Backup imported successfully. ${data.length} products and ${transactions.length} transactions loaded.`);
+    }catch(err){
+      console.error('Import failed',err);
+      alert('Invalid JSON backup. Please select a CEDCO inventory backup JSON file.');
+    }finally{e.target.value='';}
+  };
+  rd.onerror=()=>{alert('Could not read the selected JSON file.');e.target.value='';};
+  rd.readAsText(f);
+}
 function resetData(){if(confirm('Restore the original register? All local product edits and transaction history will be replaced. A backup will be downloaded first.')){download('cedco_gym_pre_reset_backup.json',JSON.stringify({version:6,data,transactions},null,2),'application/json');data=structuredClone(originalData);transactions=[];save();renderAll()}}
 async function bootDesktop(){
   if(window.cedcoStore?.isDesktop){

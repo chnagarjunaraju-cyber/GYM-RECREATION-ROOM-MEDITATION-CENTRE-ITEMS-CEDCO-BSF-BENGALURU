@@ -686,10 +686,96 @@ function printCodeLabel(){const r=getProduct($('codeModal').dataset.productId);i
 function printAllQR(){const rows=data.filter(r=>qrPath(r.ID));if(!rows.length)return alert('No numeric Product SRL Nos. available.');const cards=rows.map(r=>`<div class="label"><div class="brand">CEDCO BSF BENGALURU GYM EQPTS INVENTORY</div><div class="srl">PRODUCT SRL NO. ${esc(r['SRL NO'])}</div><div class="product">${esc(r.NOMENCLATURE)}</div><img src="${qrPath(r.ID)}" class="qr"><div class="cap">SCAN QR FOR FULL ITEM DETAILS • SRL ${esc(r['SRL NO'])}</div></div>`).join('');const w=window.open('','_blank','width=1000,height=800');if(!w)return;w.document.write(`<html><head><title>Print Preview — CEDCO BSF Gym QR Labels</title><style>body{margin:0;background:#eef2f5;font-family:Arial}.toolbar{position:sticky;top:0;background:#102236;color:#fff;padding:12px 16px;display:flex;gap:10px;align-items:center;z-index:10}.toolbar button{border:0;border-radius:8px;padding:10px 16px;font-weight:700;cursor:pointer}.print{background:#16a276;color:#fff}.close{background:#ddd}.sheet{background:#fff;margin:20px auto;padding:20px;width:calc(100% - 80px);max-width:1200px;display:grid;grid-template-columns:repeat(3,1fr);gap:12px}.label{border:2px solid #222;border-radius:12px;padding:12px;text-align:center;break-inside:avoid}.brand{font-size:9px;font-weight:900}.srl{font-size:22px;font-weight:900;margin:5px}.product{font-size:11px;font-weight:700;min-height:28px}.qr{width:130px;height:130px}.cap{font-size:8px;font-weight:700}@media print{body{background:#fff}.toolbar{display:none}.sheet{width:auto;margin:0;padding:0;max-width:none;box-shadow:none}@page{margin:8mm}}</style></head><body><div class="toolbar"><b>PRINT PREVIEW</b><span style="opacity:.7">QR Labels</span><span style="flex:1"></span><button class="print" onclick="window.print()">🖨 Print All Labels</button><button class="close" onclick="window.close()">Close</button></div><div class="sheet">${cards}</div></body></html>`);w.document.close()}
 function exportCSV(){const headers=['SRL NO','LP NO','NOMENCLATURE','SERIAL NO.','UNIT','OPENING QTY','RECD','ISSUED','RETURN','BALANCE','RATE','D.O.P','MAIN LP NO','REMARKS'];const csv=[headers.join(','),...data.map(r=>headers.map(h=>'"'+String(r[h]??'').replaceAll('"','""')+'"').join(','))].join('\n');download('cedco_gym_inventory.csv',csv,'text/csv;charset=utf-8')}
 function exportHistoryCSV(){const headers=['Date/Time','Type','Transaction No','Product SRL No','Product','Quantity','From/To','Remarks'];const csv=[headers.join(','),...transactions.map(t=>[new Date(t.createdAt).toLocaleString('en-IN'),t.type,t.no,t.srl,t.product,t.qty,t.party,t.remarks].map(v=>'"'+String(v??'').replaceAll('"','""')+'"').join(','))].join('\n');download('cedco_gym_transaction_history.csv',csv,'text/csv;charset=utf-8')}
-function exportJSON(){download('cedco_gym_inventory_backup.json',JSON.stringify({version:5,data,transactions},null,2),'application/json')}
-async function desktopBackup(){if(window.cedcoStore?.backup){const r=await window.cedcoStore.backup(); if(r?.ok) alert('Database backup saved to: '+r.filePath); else if(!r?.canceled) alert('Backup failed.');}else exportJSON()}
-function download(name,text,type){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([text],{type}));a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),500)}
-function importJSON(e){const f=e.target.files[0];if(!f)return;const rd=new FileReader();rd.onload=()=>{try{const x=JSON.parse(rd.result);if(!Array.isArray(x)&&!Array.isArray(x.data))throw 0;download('cedco_gym_pre_import_backup.json',JSON.stringify({version:6,data,transactions},null,2),'application/json');data=Array.isArray(x)?x:x.data;transactions=Array.isArray(x.transactions)?x.transactions:[];if(!Array.isArray(data))throw 0;save();renderAll();alert('Backup imported successfully.')}catch{alert('Invalid JSON backup.')}};rd.readAsText(f)}
+function exportJSON(){
+  try{
+    const payload={
+      schemaVersion:8,
+      version:8,
+      app:'CEDCO BSF Bengaluru Gym Eqpts Inventory',
+      exportedAt:new Date().toISOString(),
+      data:Array.isArray(data)?data:[],
+      transactions:Array.isArray(transactions)?transactions:[]
+    };
+    const text=JSON.stringify(payload,null,2);
+    const blob=new Blob([text],{type:'application/json;charset=utf-8'});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');
+    a.href=url;
+    a.download='cedco_gym_inventory_backup.json';
+    a.style.display='none';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(()=>{a.remove();URL.revokeObjectURL(url)},1500);
+    setTimeout(()=>alert(`Backup JSON created successfully. ${payload.data.length} products and ${payload.transactions.length} transactions included. Check your browser Downloads folder.`),100);
+    return true;
+  }catch(e){
+    console.error('JSON backup failed',e);
+    alert('Backup could not be downloaded. Please check browser download permissions.');
+    return false;
+  }
+}
+async function desktopBackup(){
+  try{
+    if(window.cedcoStore?.backup){
+      const r=await window.cedcoStore.backup();
+      if(r?.ok){alert('Database backup saved to: '+r.filePath);return;}
+      if(r?.canceled)return;
+    }
+  }catch(e){console.warn('Desktop backup unavailable; using browser JSON backup.',e)}
+  exportJSON();
+}
+function download(name,text,type){
+  try{
+    const blob=new Blob([text],{type:type||'application/octet-stream'});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');
+    a.href=url;a.download=name;a.style.display='none';
+    document.body.appendChild(a);a.click();
+    setTimeout(()=>{a.remove();URL.revokeObjectURL(url)},1500);
+  }catch(e){console.error('Download failed',e);alert('Download failed. Please check browser download permissions.')}
+}
+function extractBackupPayload(x){
+  // Accept all CEDCO backup formats used by previous versions.
+  let root=x;
+  if(root && typeof root==='object' && root.backup && typeof root.backup==='object') root=root.backup;
+  if(root && typeof root==='object' && root.payload && typeof root.payload==='object') root=root.payload;
+  let incoming=null;
+  if(Array.isArray(root)) incoming=root;
+  else if(root && Array.isArray(root.data)) incoming=root.data;
+  else if(root && Array.isArray(root.products)) incoming=root.products;
+  else if(root && Array.isArray(root.inventory)) incoming=root.inventory;
+  else if(root && Array.isArray(root.records)) incoming=root.records;
+  if(!Array.isArray(incoming)) return null;
+  const tx=(root && Array.isArray(root.transactions))?root.transactions:[];
+  return {data:incoming,transactions:tx};
+}
+function importJSON(e){
+  const f=e.target.files&&e.target.files[0];
+  if(!f)return;
+  const rd=new FileReader();
+  rd.onload=()=>{
+    try{
+      const raw=String(rd.result||'').replace(/^\uFEFF/,'').trim();
+      if(!raw)throw new Error('The selected file is empty.');
+      const x=JSON.parse(raw);
+      const parsed=extractBackupPayload(x);
+      if(!parsed)throw new Error('No inventory array found.');
+      if(!parsed.data.length && !confirm('The selected backup contains 0 products. Import it anyway?')) return;
+      download('cedco_gym_pre_import_backup.json',JSON.stringify({schemaVersion:8,version:8,app:'CEDCO BSF Bengaluru Gym Eqpts Inventory',exportedAt:new Date().toISOString(),data,transactions},null,2),'application/json;charset=utf-8');
+      data=structuredClone(parsed.data);
+      transactions=structuredClone(parsed.transactions);
+      save();
+      renderAll();
+      showView('inventory');
+      alert(`Backup imported successfully. ${data.length} products and ${transactions.length} transactions loaded.`);
+    }catch(err){
+      console.error('Import failed',err);
+      alert('Invalid JSON backup. Please select a CEDCO inventory backup JSON file.');
+    }finally{e.target.value='';}
+  };
+  rd.onerror=()=>{alert('Could not read the selected JSON file.');e.target.value='';};
+  rd.readAsText(f);
+}
 function resetData(){if(confirm('Restore the original register? All local product edits and transaction history will be replaced. A backup will be downloaded first.')){download('cedco_gym_pre_reset_backup.json',JSON.stringify({version:6,data,transactions},null,2),'application/json');data=structuredClone(originalData);transactions=[];save();renderAll()}}
 async function bootDesktop(){
   if(window.cedcoStore?.isDesktop){
