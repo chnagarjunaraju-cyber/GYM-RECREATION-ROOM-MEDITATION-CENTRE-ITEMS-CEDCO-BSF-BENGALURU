@@ -735,18 +735,58 @@ function download(name,text,type){
   }catch(e){console.error('Download failed',e);alert('Download failed. Please check browser download permissions.')}
 }
 function extractBackupPayload(x){
-  // Accept all CEDCO backup formats used by previous versions.
-  let root=x;
-  if(root && typeof root==='object' && root.backup && typeof root.backup==='object') root=root.backup;
-  if(root && typeof root==='object' && root.payload && typeof root.payload==='object') root=root.payload;
-  let incoming=null;
-  if(Array.isArray(root)) incoming=root;
-  else if(root && Array.isArray(root.data)) incoming=root.data;
-  else if(root && Array.isArray(root.products)) incoming=root.products;
-  else if(root && Array.isArray(root.inventory)) incoming=root.inventory;
-  else if(root && Array.isArray(root.records)) incoming=root.records;
-  if(!Array.isArray(incoming)) return null;
-  const tx=(root && Array.isArray(root.transactions))?root.transactions:[];
+  // Accept CEDCO backups from current and older versions, including backups
+  // wrapped in payload/backup/export/root objects and plain product arrays.
+  const seen=new Set();
+  function findRoot(v, depth=0){
+    if(v==null || depth>6) return null;
+    if(typeof v==='string') return null;
+    if(Array.isArray(v)) return v;
+    if(typeof v!=='object') return null;
+    if(seen.has(v)) return null;
+    seen.add(v);
+    const preferred=['data','products','inventory','records','items','equipments','equipment','stock','register'];
+    for(const k of preferred){
+      if(Array.isArray(v[k])) return v[k];
+    }
+    // Common wrappers used by exported backups.
+    for(const k of ['backup','payload','export','backupData','database','state','result']){
+      if(v[k] && typeof v[k]==='object'){
+        const found=findRoot(v[k],depth+1);
+        if(found) return found;
+      }
+    }
+    // Last-resort recursive search for an array of inventory-like objects.
+    for(const [k,val] of Object.entries(v)){
+      if(k==='transactions' || k==='history' || k==='logs') continue;
+      if(Array.isArray(val) && val.length){
+        const sample=val.find(x=>x && typeof x==='object');
+        if(sample && ('NOMENCLATURE' in sample || 'SRL NO' in sample || 'SRL' in sample || 'nomenclature' in sample || 'srl' in sample)) return val;
+      }
+      if(val && typeof val==='object'){
+        const found=findRoot(val,depth+1);
+        if(found) return found;
+      }
+    }
+    return null;
+  }
+  const incoming=findRoot(x);
+  if(!incoming) return null;
+
+  function findTransactions(v,depth=0){
+    if(v==null || depth>6 || typeof v!=='object') return [];
+    if(Array.isArray(v)) return [];
+    for(const k of ['transactions','transactionHistory','history','movements','logs']){
+      if(Array.isArray(v[k])) return v[k];
+    }
+    for(const k of ['backup','payload','export','backupData','database','state','result']){
+      if(v[k] && typeof v[k]==='object'){
+        const t=findTransactions(v[k],depth+1); if(t.length) return t;
+      }
+    }
+    return [];
+  }
+  const tx=findTransactions(x);
   return {data:incoming,transactions:tx};
 }
 function importJSON(e){
@@ -759,18 +799,27 @@ function importJSON(e){
       if(!raw)throw new Error('The selected file is empty.');
       const x=JSON.parse(raw);
       const parsed=extractBackupPayload(x);
-      if(!parsed)throw new Error('No inventory array found.');
-      if(!parsed.data.length && !confirm('The selected backup contains 0 products. Import it anyway?')) return;
+      if(!parsed)throw new Error('No inventory records found in selected JSON.');
+      const normalized=parsed.data.map((r,i)=>{
+        if(!r || typeof r!=='object') return null;
+        const q={...r};
+        if(q['SRL NO']==null && q.SRL!=null) q['SRL NO']=q.SRL;
+        if(q.NOMENCLATURE==null && q.nomenclature!=null) q.NOMENCLATURE=q.nomenclature;
+        if(q['OPENING QTY']==null && q.openingQty!=null) q['OPENING QTY']=q.openingQty;
+        if(q.BALANCE==null && q.balance!=null) q.BALANCE=q.balance;
+        return q;
+      }).filter(Boolean);
+      if(!normalized.length && !confirm('The selected backup contains 0 products. Import it anyway?')) return;
       download('cedco_gym_pre_import_backup.json',JSON.stringify({schemaVersion:8,version:8,app:'CEDCO BSF Bengaluru Gym Eqpts Inventory',exportedAt:new Date().toISOString(),data,transactions},null,2),'application/json;charset=utf-8');
-      data=structuredClone(parsed.data);
-      transactions=structuredClone(parsed.transactions);
+      data=structuredClone(normalized);
+      transactions=structuredClone(parsed.transactions||[]);
       save();
       renderAll();
       showView('inventory');
       alert(`Backup imported successfully. ${data.length} products and ${transactions.length} transactions loaded.`);
     }catch(err){
       console.error('Import failed',err);
-      alert('Invalid JSON backup. Please select a CEDCO inventory backup JSON file.');
+      alert('Unable to import this JSON. Please select a CEDCO inventory backup or a compatible JSON export.');
     }finally{e.target.value='';}
   };
   rd.onerror=()=>{alert('Could not read the selected JSON file.');e.target.value='';};
