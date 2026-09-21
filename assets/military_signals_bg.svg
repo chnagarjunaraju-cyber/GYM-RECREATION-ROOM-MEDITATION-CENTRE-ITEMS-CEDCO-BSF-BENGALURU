@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1920" height="1080" viewBox="0 0 1920 1080">
+<defs>
+ <linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#08140e"/><stop offset=".48" stop-color="#1a3022"/><stop offset="1" stop-color="#050b08"/></linearGradient>
+ <radialGradient id="v"><stop stop-color="#4a6944" stop-opacity=".42"/><stop offset="1" stop-color="#08100d" stop-opacity="0"/></radialGradient>
+ <pattern id="c" width="240" height="170" patternUnits="userSpaceOnUse"><path d="M0 42Q55 0 118 38T240 28V100Q175 145 105 108T0 135Z" fill="#304a2d" opacity=".48"/><path d="M25 8Q82 42 145 8T240 52V160Q180 120 120 158T0 130V48Z" fill="#142c1c" opacity=".78"/><ellipse cx="55" cy="125" rx="45" ry="25" fill="#536343" opacity=".18"/></pattern>
+ <pattern id="grid" width="80" height="80" patternUnits="userSpaceOnUse"><path d="M80 0H0V80" fill="none" stroke="#a8b887" stroke-width="1" opacity=".16"/></pattern>
+ <filter id="glow"><feGaussianBlur stdDeviation="4" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+</defs>
+<rect width="1920" height="1080" fill="url(#g)"/>
+<rect width="1920" height="1080" fill="url(#c)"/>
+<rect width="1920" height="1080" fill="url(#grid)"/>
+<ellipse cx="960" cy="250" rx="880" ry="470" fill="url(#v)"/>
+<!-- tactical map contour lines -->
+<g fill="none" stroke="#9bab7c" opacity=".13" stroke-width="3"><path d="M40 770Q270 610 510 735T980 700T1450 730T1880 600"/><path d="M0 820Q260 650 520 780T1000 750T1490 780T1920 650"/><path d="M0 870Q280 710 540 825T1010 800T1510 825T1920 720"/></g>
+<!-- communications towers -->
+<g stroke="#b2b98a" stroke-width="7" fill="none" opacity=".66">
+ <path d="M155 930L285 160L415 930M205 690H365M230 520H340M258 350H312"/>
+ <path d="M1505 930L1625 145L1745 930M1550 690H1700M1575 510H1675M1598 335H1652"/>
+</g>
+<g stroke="#d9c978" stroke-width="3" opacity=".72"><path d="M285 160V70M1625 145V55"/><circle cx="285" cy="70" r="14" fill="#d9c978"/><circle cx="1625" cy="55" r="14" fill="#d9c978"/></g>
+<!-- radio signal arcs -->
+<g fill="none" stroke="#d6c56c" opacity=".62" filter="url(#glow)"><path d="M45 235Q285 35 525 235" stroke-width="8"/><path d="M10 300Q285 -5 560 300" stroke-width="4"/><path d="M1350 250Q1625 20 1905 250" stroke-width="8"/><path d="M1290 315Q1625 -20 1940 315" stroke-width="4"/></g>
+<!-- field radio set -->
+<g transform="translate(770 690)" opacity=".52" stroke="#d2c473" fill="none">
+ <rect x="0" y="0" width="380" height="205" rx="18" stroke-width="7"/><rect x="28" y="28" width="180" height="65" rx="6" stroke-width="4"/><circle cx="270" cy="58" r="25" stroke-width="5"/><circle cx="325" cy="58" r="25" stroke-width="5"/><path d="M65 128H320M65 158H280M65 187H230" stroke-width="5"/><path d="M55 0V-125M55-125L95-165" stroke-width="8"/><path d="M380 55q95 45 0 90M380 25q150 75 0 150" stroke-width="5"/></g>
+<!-- military chevrons / command motif -->
+<g fill="none" stroke="#d4c477" opacity=".38" stroke-width="7"><path d="M845 130l70 55 70-55"/><path d="M845 160l70 55 70-55"/><path d="M845 190l70 55 70-55"/></g>
+<!-- horizon and field silhouettes -->
+<path d="M0 930Q220 875 430 925T820 915T1220 930T1600 905T1920 920V1080H0Z" fill="#020704" opacity=".82"/>
+<g fill="#09150e" opacity=".94"><rect x="470" y="845" width="170" height="82"/><rect x="670" y="815" width="220" height="112"/><rect x="1040" y="835" width="230" height="92"/><rect x="1330" y="850" width="175" height="77"/><path d="M450 845l75-52 115 52M1010 835l90-58 145 58"/></g>
+<!-- lower signal bands -->
+<g stroke="#89a77b" stroke-width="2" opacity=".22"><path d="M0 980H1920M0 1000H1920M0 1020H1920M0 1040H1920"/></g>
+<text x="70" y="1035" fill="#d4c477" opacity=".32" font-family="Arial, sans-serif" font-size="20" letter-spacing="6">FIELD COMMUNICATION • SIGNALS • READINESS • CEDCO BSF BENGALURU</text>
+</svg>
